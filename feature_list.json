@@ -46,8 +46,8 @@
       "verification": [
         "manual (make dev): trigger play — audio starts; trigger pause — audio stops"
       ],
-      "evidence": "Code complete in Sources/PhonkJazz/{PlayerController,YTMScript}.swift (autoplay retry after didFinish). Builds clean.",
-      "notes": "Blocked only on manual acceptance: needs real audio + a logged-in session. YTM selectors are centralized in YTMScript.swift; confirm against live DOM and tune autoplay if the player needs a user gesture."
+      "evidence": "Bug fixed 2026-08-06: was navigating to /playlist?list= (stays paused, no source). Now converts to /watch?list= via YTMURL.watchURL (Core, unit-tested). Verified headlessly in a WKWebView with the app's config: the watch URL auto-plays (video.paused == false) while the playlist URL stays paused. Files: Sources/PhonkJazzCore/YTMURL.swift, Sources/PhonkJazz/{PlayerController,YTMScript}.swift.",
+      "notes": "Autoplay confirmed logged-out; the only remaining check is real audio on the user's logged-in account via make dev. Selectors centralized in YTMScript.swift."
     },
     {
       "id": "mode-toggle",

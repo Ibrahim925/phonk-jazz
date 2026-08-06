@@ -41,10 +41,13 @@ from current Safari. Verify propagation by reading `navigator.userAgent` back vi
 `evaluateJavaScript` — it must equal the string above.
 
 ## Playing a playlist
-A YTM playlist URL looks like `https://music.youtube.com/playlist?list=<PLAYLIST_ID>`.
-To switch playlists, navigate the WebView to that URL, then start playback. The
-web player exposes an HTML5 `<video>`/`<audio>` element and on-page controls;
-drive them with `evaluateJavaScript`:
+A YTM playlist URL looks like `https://music.youtube.com/playlist?list=<ID>`, but
+navigating there only *shows* the playlist — its `<video>` element stays paused
+with no source, so nothing plays. To actually start playback, navigate to the
+**watch** URL `https://music.youtube.com/watch?list=<ID>`: YTM loads the player,
+auto-selects the first track, and begins playing. (Verified against the live
+site: playlist URL → `video.paused == true`; watch URL → `video.paused == false`.)
+Use `YTMURL.watchURL(from:)` (Core) to convert. Then reinforce with JS:
 
 ```swift
 // Start / resume playback (illustrative — verify selectors against the live DOM)

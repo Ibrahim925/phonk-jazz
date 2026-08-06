@@ -10,8 +10,9 @@ enum YTMScript {
     static let play = """
         (function () {
           var v = document.querySelector('video');
-          if (v) { v.play(); return 'video'; }
-          var b = document.querySelector('#play-pause-button, tp-yt-paper-icon-button.play-pause-button');
+          if (v && v.paused) { var p = v.play(); if (p && p.catch) { p.catch(function () {}); } return 'video'; }
+          if (v) { return 'already'; }
+          var b = document.querySelector('#play-pause-button, tp-yt-paper-icon-button.play-pause-button, ytmusic-play-button-renderer');
           if (b) { b.click(); return 'button'; }
           return 'none';
         })();

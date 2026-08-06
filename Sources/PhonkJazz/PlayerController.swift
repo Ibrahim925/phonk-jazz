@@ -1,3 +1,4 @@
+import PhonkJazzCore
 import WebKit
 
 /// Owns the off-screen `WKWebView` that hosts the YouTube Music web player and
@@ -28,11 +29,13 @@ final class PlayerController: NSObject, WKNavigationDelegate {
         webView.customUserAgent = Self.safariUserAgent
     }
 
-    /// Loads `urlString` in the player. When `autoplay` is true, playback is
-    /// attempted once the page finishes loading (with a few retries, since the
-    /// YTM SPA wires up its player asynchronously).
+    /// Loads a playlist. When `autoplay` is true the URL is converted to a YTM
+    /// *watch* URL (which actually starts playback) and play is reinforced once
+    /// the page loads; when false the playlist page loads silently (no autostart),
+    /// used to warm the WebView without making noise on launch.
     func load(_ urlString: String, autoplay: Bool) {
-        guard let url = URL(string: urlString) else { return }
+        let target = autoplay ? YTMURL.watchURL(from: urlString) : urlString
+        guard let url = URL(string: target) else { return }
         autoplayAfterLoad = autoplay
         webView.load(URLRequest(url: url))
     }
