@@ -16,6 +16,7 @@ final class AppController: NSObject {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var hotKey: GlobalHotKey?
     private var settings: SettingsWindowController?
+    private var playerWindow: PlayerWindowController?
 
     override init() {
         config = store.load()
@@ -66,6 +67,13 @@ final class AppController: NSObject {
         controller.present()
     }
 
+    @objc private func showPlayerAction() {
+        if playerWindow == nil {
+            playerWindow = PlayerWindowController(webView: player.webView)
+        }
+        playerWindow?.present()
+    }
+
     // MARK: - UI
 
     private func buildMenu() {
@@ -76,6 +84,11 @@ final class AppController: NSObject {
         ).target = self
         menu.addItem(
             withTitle: "Play / Pause", action: #selector(playPauseAction), keyEquivalent: ""
+        ).target = self
+        menu.addItem(.separator())
+        menu.addItem(
+            withTitle: "Sign in / Show Player…", action: #selector(showPlayerAction),
+            keyEquivalent: ""
         ).target = self
         menu.addItem(.separator())
         menu.addItem(
