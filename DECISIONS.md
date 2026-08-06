@@ -59,3 +59,15 @@
 - Constraint: first run has no way to surface Google sign-in — a "Sign in…" menu
   item (or one-time visible WebView) is a required follow-up before login works.
   Never log or persist session cookies anywhere but the WKWebsiteDataStore.
+
+## 2026-08-06: Spoof desktop Safari UA to get Google sign-in in the WebView
+- Reason: Google blocks OAuth sign-in from embedded webviews ("browser may not be
+  secure — use Chrome/Firefox/Safari"). Setting `WKWebView.customUserAgent` to a
+  real desktop Safari string makes Google treat it as Safari (which it is — same
+  WebKit engine), so login proceeds. Verified: `navigator.userAgent` reports the
+  spoofed string exactly.
+- Rejected alternative: faking a Chrome/Firefox UA (rendering quirks serving
+  non-WebKit code paths to a WebKit engine); external OAuth/system-browser login
+  (no cookie transfer into the WebView; YTM isn't an OAuth client we own).
+- Constraint: the `Version/` number in the UA drifts from current Safari over
+  time; bump it in `PlayerController.safariUserAgent` if Google starts rejecting.

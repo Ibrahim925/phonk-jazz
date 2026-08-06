@@ -20,6 +20,26 @@ config.websiteDataStore = .default()  // persistent; NOT .nonPersistent()
 - The WebView can live off-screen (add to an unshown window or a zero-alpha
   window) since playback continues without the view being visible.
 
+## Google sign-in block (why a custom User-Agent is required)
+Google refuses OAuth sign-in from embedded webviews and shows *"Couldn't sign
+you in — this browser or app may not be secure. Try using a different browser"*
+(listing Chrome/Firefox/Safari). This is NOT about the user's default browser; it
+is Google detecting a `WKWebView`.
+
+Fix: present a real **desktop Safari** User-Agent. `WKWebView` genuinely is
+Safari's WebKit engine, so Google accepts it and login proceeds — with no
+rendering quirks (unlike faking Chrome/Firefox on a WebKit engine).
+
+```swift
+webView.customUserAgent =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    + "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15"
+```
+
+Set in `PlayerController.init`. Bump the `Version/` number when it drifts far
+from current Safari. Verify propagation by reading `navigator.userAgent` back via
+`evaluateJavaScript` — it must equal the string above.
+
 ## Playing a playlist
 A YTM playlist URL looks like `https://music.youtube.com/playlist?list=<PLAYLIST_ID>`.
 To switch playlists, navigate the WebView to that URL, then start playback. The

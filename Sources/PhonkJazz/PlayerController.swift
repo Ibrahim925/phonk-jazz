@@ -9,6 +9,15 @@ final class PlayerController: NSObject, WKNavigationDelegate {
     private var autoplayAfterLoad = false
     private var autoplayAttempts = 0
 
+    /// Desktop Safari User-Agent. Google refuses to sign you in from an embedded
+    /// webview ("this browser or app may not be secure — use a supported
+    /// browser"). Presenting a real Safari UA makes Google treat the WebView as
+    /// Safari (which it genuinely is — same WebKit engine), so login proceeds.
+    /// Bump the Version/ number occasionally to track current Safari.
+    private static let safariUserAgent =
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        + "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15"
+
     override init() {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()  // persistent: keeps the login
@@ -16,6 +25,7 @@ final class PlayerController: NSObject, WKNavigationDelegate {
         webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
         webView.navigationDelegate = self
+        webView.customUserAgent = Self.safariUserAgent
     }
 
     /// Loads `urlString` in the player. When `autoplay` is true, playback is
