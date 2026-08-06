@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    # macOS runner: the app links AppKit + WebKit, so it can't build on Linux.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Setup
+        run: make setup
+
+      # Same gate as local: swift-format lint (bundled in the toolchain) +
+      # build (typecheck) + XCTest. GUI/audio paths aren't tested here.
+      - name: Check
+        run: make check
