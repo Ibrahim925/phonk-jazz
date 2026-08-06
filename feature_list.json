@@ -34,8 +34,8 @@
       "verification": [
         "manual (make dev): sign into Google in the WebView, quit, relaunch — still logged in"
       ],
-      "evidence": "Code complete in Sources/PhonkJazz/PlayerController.swift (WKWebsiteDataStore.default(), mediaTypes... = []). Builds clean.",
-      "notes": "Blocked only on manual acceptance: requires the user's Google login on their machine. Currently the WebView is not attached to any visible window, so there is no UI to log in through yet — first manual run needs a way to surface it (e.g. temporarily show the WebView, or add a 'Sign in' menu item). Flag for the login-UX follow-up."
+      "evidence": "Code complete in Sources/PhonkJazz/{PlayerController,PlayerWindowController}.swift (WKWebsiteDataStore.default(), mediaTypes... = []). 'Sign in / Show Player…' menu item surfaces the WebView in a window for login. Builds clean.",
+      "notes": "Blocked only on manual acceptance: open 'Sign in / Show Player…', log into Google once, then verify login persists across a relaunch. No longer blocked on missing UI."
     },
     {
       "id": "playback-control-js",
