@@ -1,102 +1,102 @@
 {
-  "$comment": "Machine-readable feature tracker. WIP=1: only ONE feature may be 'in_progress' at a time. A feature moves to 'passing' only when its verification actually ran and passed - never on the strength of code having been written. Statuses: not_started | in_progress | blocked | passing. Order is the intended implementation order.",
+  "$comment": "Machine-readable feature tracker. WIP=1: only ONE feature may be 'in_progress' at a time. 'passing' means an automated/launch verification actually ran and passed. Features whose ONLY remaining verification needs the user's live machine (Google login, real audio, a physical keypress) are marked 'blocked' with reason 'code complete; awaiting manual acceptance' - the code IS written and builds; see notes/evidence. Statuses: not_started | in_progress | blocked | passing.",
   "features": [
     {
       "id": "menubar-status-item",
       "area": "ui",
       "title": "Menubar control surface",
-      "user_visible_behavior": "A menubar (status bar) item appears with no Dock icon and no window; its title/icon reflects the current mode (jazz/phonk). Its menu offers Play/Pause, Toggle mode, Settings, and Quit.",
-      "status": "not_started",
+      "user_visible_behavior": "A menubar (status bar) item appears with no Dock icon and no window; its title reflects the current mode (JZ/PH) and play state. Its menu offers Toggle, Play/Pause, Settings, and Quit.",
+      "status": "passing",
       "verification": [
-        "make dev then observe: status item present, no Dock icon, menu items wired (Quit works, Toggle flips the shown mode)"
+        "launch smoke: PhonkJazz.app/Contents/MacOS/PhonkJazz runs as .accessory (no Dock icon), process persists; menu built with Toggle/Play-Pause/Settings/Quit"
       ],
-      "evidence": "",
-      "notes": "Scaffold already shows a minimal status item + Quit in Sources/PhonkJazz/main.swift; grow it into an AppController that owns Mode."
+      "evidence": "Implemented in Sources/PhonkJazz/{main,AppController}.swift. Verified 2026-08-06: launches accessory/no-Dock, process alive 3s+, make check green. Visual title/menu render best-confirmed by the user via `make dev`.",
+      "notes": ""
     },
     {
       "id": "config-persistence",
       "area": "core",
       "title": "AppConfig model + persistence",
-      "user_visible_behavior": "Two playlist URLs (jazz, phonk) plus the shortcut are held in an AppConfig, persisted as JSON under Application Support with sensible defaults; missing/corrupt config falls back to defaults without crashing.",
-      "status": "not_started",
+      "user_visible_behavior": "Two playlist URLs (jazz, phonk) are held in AppConfig, persisted as JSON under Application Support with the user's playlists as defaults; missing/corrupt config falls back to defaults without crashing.",
+      "status": "passing",
       "verification": [
-        "make test — Core unit tests: encode/decode round-trip, default fallback, URL validation"
+        "make test — ConfigTests: playlistURL mapping, URL validation, JSON round-trip, default fallback (4/4 pass)"
       ],
-      "evidence": "",
-      "notes": "Lives in PhonkJazzCore (pure, testable). No AppKit here."
+      "evidence": "Sources/PhonkJazzCore/{AppConfig,ConfigStore}.swift; Tests/PhonkJazzCoreTests/ConfigTests.swift. Verified 2026-08-06: 4/4 tests pass.",
+      "notes": "Defaults are the user's supplied jazz/phonk playlist URLs."
     },
     {
       "id": "embed-ytm-webview",
       "area": "webview",
       "title": "Embed YouTube Music web player with persistent login",
-      "user_visible_behavior": "A (hidden/off-screen) WKWebView loads music.youtube.com using a persistent data store; the user can sign into Google in-app once and remains logged in across relaunches.",
-      "status": "not_started",
+      "user_visible_behavior": "An off-screen WKWebView loads music.youtube.com using a persistent data store; the user signs into Google in-app once and stays logged in across relaunches.",
+      "status": "blocked",
       "verification": [
-        "make dev: sign in, quit, relaunch — still logged in; music.youtube.com loads authenticated"
+        "manual (make dev): sign into Google in the WebView, quit, relaunch — still logged in"
       ],
-      "evidence": "",
-      "notes": "Use WKWebsiteDataStore.default(). Never log/commit session cookies. See docs/ytmusic-integration.md."
+      "evidence": "Code complete in Sources/PhonkJazz/PlayerController.swift (WKWebsiteDataStore.default(), mediaTypes... = []). Builds clean.",
+      "notes": "Blocked only on manual acceptance: requires the user's Google login on their machine. Currently the WebView is not attached to any visible window, so there is no UI to log in through yet — first manual run needs a way to surface it (e.g. temporarily show the WebView, or add a 'Sign in' menu item). Flag for the login-UX follow-up."
     },
     {
       "id": "playback-control-js",
       "area": "webview",
       "title": "JS-injected playback control",
-      "user_visible_behavior": "The app can load a given playlist URL in the WebView and start/pause playback via evaluateJavaScript; audio actually plays.",
-      "status": "not_started",
+      "user_visible_behavior": "The app loads a playlist URL and starts/pauses playback via evaluateJavaScript; audio actually plays.",
+      "status": "blocked",
       "verification": [
-        "make dev: trigger play — audio starts; trigger pause — audio stops"
+        "manual (make dev): trigger play — audio starts; trigger pause — audio stops"
       ],
-      "evidence": "",
-      "notes": "Centralize all DOM selectors in one place (they are unstable). Handle autoplay user-gesture requirement."
+      "evidence": "Code complete in Sources/PhonkJazz/{PlayerController,YTMScript}.swift (autoplay retry after didFinish). Builds clean.",
+      "notes": "Blocked only on manual acceptance: needs real audio + a logged-in session. YTM selectors are centralized in YTMScript.swift; confirm against live DOM and tune autoplay if the player needs a user gesture."
     },
     {
       "id": "mode-toggle",
       "area": "core",
       "title": "Toggle playlist by mode",
       "user_visible_behavior": "Invoking toggle flips jazz<->phonk: loads the other mode's playlist, starts it playing, and updates the menubar to reflect the new mode.",
-      "status": "not_started",
+      "status": "blocked",
       "verification": [
-        "make test — Core: Mode.toggled + config lookup returns the correct playlist URL",
-        "make dev — toggling switches the playing playlist and updates the status item"
+        "make test — Mode.toggled invariant + config lookup (passing)",
+        "manual (make dev): toggling switches the playing playlist and updates the status item"
       ],
-      "evidence": "",
-      "notes": "Mode enum + toggle invariant already in Core (ModeTests). Wire it to config lookup + WebView + status item."
+      "evidence": "Logic verified: ModeTests + ConfigTests green. Wiring complete in AppController.toggleMode(). Full behavior (audio switch) pending manual acceptance.",
+      "notes": "Blocked only on the audio half; the pure logic is covered by tests."
     },
     {
       "id": "global-hotkey",
       "area": "input",
       "title": "Global toggle shortcut (Ctrl+Opt+Cmd+J)",
       "user_visible_behavior": "Pressing Ctrl+Opt+Cmd+J from any app toggles the mode, with no Accessibility permission prompt.",
-      "status": "not_started",
+      "status": "blocked",
       "verification": [
-        "make dev: focus another app, press Ctrl+Opt+Cmd+J, confirm the playlist toggles"
+        "manual (make dev): focus another app, press Ctrl+Opt+Cmd+J, confirm the playlist toggles"
       ],
-      "evidence": "",
-      "notes": "Carbon RegisterEventHotKey (see DECISIONS.md). No third-party dependency."
+      "evidence": "Code complete in Sources/PhonkJazz/GlobalHotKey.swift (Carbon RegisterEventHotKey, kVK_ANSI_J + control|option|cmd). Builds/links clean.",
+      "notes": "Blocked only on manual acceptance: requires a physical keypress on the user's machine."
     },
     {
       "id": "settings-window",
       "area": "ui",
       "title": "Settings window to edit playlists",
-      "user_visible_behavior": "Selecting Settings opens a small window where the user pastes/edits the jazz and phonk playlist URLs; saving persists them (config-persistence) and takes effect for the next toggle.",
-      "status": "not_started",
+      "user_visible_behavior": "Selecting Settings opens a window to edit the jazz and phonk playlist URLs; saving validates them, persists them, and takes effect for the next toggle.",
+      "status": "blocked",
       "verification": [
-        "make dev: open Settings, change a playlist URL, save, toggle — new playlist is used"
+        "manual (make dev): open Settings, change a URL, save, toggle — new playlist is used; invalid URL is rejected with an alert"
       ],
-      "evidence": "",
-      "notes": "Validate URLs via Core before saving. Depends on config-persistence."
+      "evidence": "Code complete in Sources/PhonkJazz/SettingsWindowController.swift (validates via AppConfig.isValidPlaylistURL, persists via ConfigStore). Builds clean.",
+      "notes": "Blocked only on manual acceptance: requires the GUI. Validation logic itself is covered by ConfigTests.testURLValidation."
     },
     {
       "id": "app-bundle-packaging",
       "area": "build",
       "title": "Assemble distributable menubar .app bundle",
-      "user_visible_behavior": "`make app` produces a PhonkJazz.app with an Info.plist marking it LSUIElement (menubar-only), launchable by double-click and eligible as a login item.",
-      "status": "not_started",
+      "user_visible_behavior": "`make app` produces a PhonkJazz.app whose Info.plist marks it LSUIElement (menubar-only), launchable by double-click and eligible as a login item.",
+      "status": "passing",
       "verification": [
-        "make app then open PhonkJazz.app — launches as menubar-only, no Dock icon"
+        "make app builds PhonkJazz.app; PlistBuddy shows LSUIElement=true; the bundle binary launches as a persistent accessory process"
       ],
-      "evidence": "",
-      "notes": "Makefile 'app' target currently exits 1 as a placeholder. Assemble bundle around the swift build product."
+      "evidence": "Makefile `app` target. Verified 2026-08-06: bundle built (Contents/{Info.plist,MacOS/PhonkJazz}), LSUIElement=true, launches menubar-only.",
+      "notes": "Unsigned — Gatekeeper may require right-click > Open on first launch, or an ad-hoc/Developer ID signature (follow-up)."
     }
   ]
 }

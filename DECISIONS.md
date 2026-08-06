@@ -48,3 +48,14 @@
   step / dependency).
 - Constraint: style rules live in `.swift-format`; `make lint` also runs
   `swift build` as the typecheck step.
+
+## 2026-08-06: Off-screen WebView; in-app Sign-in UI deferred
+- Reason: Audio plays whether or not the WebView is visible, so the player runs
+  off-screen for a truly headless menubar feel. The default (persistent) data
+  store keeps the Google session across launches.
+- Rejected alternative: always showing the YTM window (defeats menubar-only) /
+  scripting Google login (fragile, and handling someone's credentials is a
+  non-goal).
+- Constraint: first run has no way to surface Google sign-in — a "Sign in…" menu
+  item (or one-time visible WebView) is a required follow-up before login works.
+  Never log or persist session cookies anywhere but the WKWebsiteDataStore.
