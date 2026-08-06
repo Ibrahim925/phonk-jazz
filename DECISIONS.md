@@ -1,0 +1,50 @@
+# Design Decisions
+
+## 2026-08-06: Native Swift/AppKit menubar app (not Electron/Tauri)
+- Reason: User chose a truly native macOS menubar-only app. `NSStatusItem` +
+  `.accessory` activation policy gives no-Dock, no-window headless behavior;
+  smallest footprint; no runtime bundling of a browser engine.
+- Rejected alternative: Electron (heaviest binary; easiest web-player embed) and
+  Tauri (lighter, but embedding + JS-controlling the YTM player is less trodden).
+- Constraint: all UI is AppKit; global hotkey and WebView are macOS-only. No
+  cross-platform path.
+
+## 2026-08-06: Play YTM by embedding the web player in WKWebView
+- Reason: YouTube Music has no official streaming API. Unofficial metadata APIs
+  cannot play audio. Driving the real web player in a persistent `WKWebView` is
+  the only reliable way to actually play a playlist; user logs into Google once
+  in-app.
+- Rejected alternative: ytmusicapi / metadata-only APIs — read playlists but
+  can't stream, so they don't satisfy "play a playlist."
+- Constraint: control is via `evaluateJavaScript` against music.youtube.com,
+  whose DOM/selectors are not a stable contract — centralize selectors so a YTM
+  redesign is a one-file fix. Must persist login via `WKWebsiteDataStore.default()`.
+
+## 2026-08-06: Global hotkey via Carbon RegisterEventHotKey
+- Reason: `RegisterEventHotKey` registers a true system-wide hotkey without the
+  Accessibility permission a global `NSEvent` monitor requires — lower install
+  friction for a background utility.
+- Rejected alternative: `NSEvent.addGlobalMonitorForEvents` (needs Accessibility
+  grant); third-party HotKey SPM package (adds a dependency for a thin Carbon wrap).
+- Constraint: default binding is `Ctrl+Opt+Cmd+J`; chosen to avoid common
+  collisions. Rebinding is a later feature.
+
+## 2026-08-06: SwiftPM with a pure Core target split from the AppKit executable
+- Reason: A `PhonkJazzCore` library with no AppKit/WebKit keeps domain logic
+  (mode toggle, config model, URL validation) unit-testable without a display,
+  so `make check` is meaningful in CI/headless. SwiftPM avoids an Xcode-project
+  dependency for agent CLI workflows.
+- Rejected alternative: single Xcode app target (GUI-only, hard to test headless);
+  everything in one executable target (nothing unit-testable without a display).
+- Constraint: Core must never import AppKit/WebKit (enforced by a grep check in
+  docs/code-style.md). Menubar `.app` distribution bundle assembled by `make app`
+  (feature app-bundle-packaging), separate from `swift run` dev.
+
+## 2026-08-06: swift-format for lint (bundled) instead of SwiftLint/SwiftFormat
+- Reason: `swift format` ships in the Swift 6 toolchain — zero external
+  dependency, works out of the box, satisfies the "ask first before adding deps"
+  boundary.
+- Rejected alternative: SwiftLint / nicklockwood SwiftFormat (both add an install
+  step / dependency).
+- Constraint: style rules live in `.swift-format`; `make lint` also runs
+  `swift build` as the typecheck step.

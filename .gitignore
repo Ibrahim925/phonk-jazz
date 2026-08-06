@@ -1,0 +1,21 @@
+# Swift / SwiftPM build output
+.build/
+.swiftpm/
+*.xcodeproj/
+DerivedData/
+
+# Distributable app bundle (produced by `make app`)
+*.app/
+
+# Secrets & local env — never commit the user's YTM/Google session or keys
+.env
+.env.*
+*.pem
+*.key
+secrets/
+
+# macOS / editor cruft
+.DS_Store
+*.swp
+.vscode/
+.idea/
