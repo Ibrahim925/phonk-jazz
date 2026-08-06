@@ -29,6 +29,20 @@ what a verification command actually confirmed.
 
 ## Session Records
 
+### 2026-08-06 (open-source) — Publish public MIT repo
+- Outcome: done. Repo live and public at https://github.com/Ibrahim925/phonk-jazz.
+- Did: Added MIT `LICENSE` (© 2026 Ibrahim Khawar), `README.md`,
+  `CONTRIBUTING.md`, and `.github/` (CI workflow + PR/issue templates), mirroring
+  the omp-plug open-sourcing layout. Also fixed playback (was `/playlist?list=`,
+  now `/watch?list=` via `YTMURL.watchURL`) and the Google sign-in webview block
+  (desktop Safari UA). Created the repo with `gh repo create --public` and pushed.
+- Verification run: `make check` green locally; GitHub confirms visibility=PUBLIC,
+  license=MIT, default branch main. CI workflow active + Actions enabled; a
+  `workflow_dispatch` run was queued (macOS hosted-runner queue delay) — CI runs
+  the same `make check` this repo passes locally.
+- Risks / follow-ups: confirm the CI run goes green once the macOS runner starts;
+  the `.app` is unsigned (Gatekeeper). No secrets/session data are in the repo.
+
 ### 2026-08-06 (implement) — Build the full app
 - Outcome: code complete; automated + launch verification green; GUI/login/audio
   acceptance pending on the user's machine.
