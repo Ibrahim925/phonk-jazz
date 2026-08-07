@@ -66,6 +66,24 @@ YTM may require a user gesture before audio can start. Options to evaluate durin
 implementation: trigger playback from within the WebView's own JS context, or
 set `config.mediaTypesRequiringUserActionForPlayback = []` on the configuration.
 
+## Memory (the WebView is a browser tab)
+The native app is ~34 MB, but the `WKWebView` runs in a separate WebKit
+`WebContent` process that can hit ~1 GB. The cost is **video decode** — YTM
+always streams a video track (even "audio" mode is `ATV`, a still-image video),
+and GPU/IOSurface frame buffers dominate the footprint (measured: RSS ~28 MB but
+`phys_footprint` ~1.3 GB — the gap is GPU memory).
+
+`YTMScript.preferAudioLowData` (applied after play + on a 15s timer, since radio
+auto-advance resets it) cuts this by:
+- Pinning `#movie_player` to `tiny` (144p) via `setPlaybackQualityRange`/
+  `setPlaybackQuality` — shrinks decode buffers dramatically.
+- On Premium, clicking `.song-button` inside `ytmusic-av-toggle` to select audio
+  mode (guarded by `is-audio-playback-mode-selected` so it never selects video).
+
+True *zero-video* requires the account setting **Settings → Playback → "Don't
+play music videos when available"** (Premium) — flip it once in your account; the
+web player then never fetches a video stream.
+
 ## Verifying (manual — GUI, not headless)
 Playback and login can't be unit-tested headlessly. Verify via `make dev`:
 1. Launch, sign into Google in the WebView, confirm YTM loads logged-in.

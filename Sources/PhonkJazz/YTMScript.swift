@@ -37,4 +37,28 @@ enum YTMScript {
           return 'none';
         })();
         """
+
+    /// Cuts the WebView's memory footprint: forces the player to the smallest
+    /// video resolution and, on Premium, switches the Song/Video toggle to
+    /// audio. YTM always streams a video track (even "audio" mode is a
+    /// still-image video), so decode buffers are the memory hog; pinning to
+    /// `tiny` shrinks them from ~1080p to ~144p. Idempotent and safe to run on a
+    /// timer: it only ever *selects* audio (never video) and no-ops when the
+    /// player/toggle aren't present. Verified selectors against the live DOM
+    /// (2026-08-06): `#movie_player` quality API + `.song-button` in
+    /// `ytmusic-av-toggle`.
+    static let preferAudioLowData = """
+        (function () {
+          var out = [];
+          var mp = document.getElementById('movie_player');
+          if (mp && mp.setPlaybackQualityRange) { mp.setPlaybackQualityRange('tiny', 'tiny'); out.push('range'); }
+          if (mp && mp.setPlaybackQuality) { mp.setPlaybackQuality('tiny'); out.push('quality'); }
+          var t = document.querySelector('ytmusic-av-toggle');
+          if (t && t.getAttribute('is-audio-playback-mode-selected') !== 'true') {
+            var song = t.querySelector('.song-button');
+            if (song) { song.click(); out.push('audio'); }
+          }
+          return out.join(',') || 'noop';
+        })();
+        """
 }

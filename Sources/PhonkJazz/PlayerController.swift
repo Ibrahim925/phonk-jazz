@@ -19,6 +19,8 @@ final class PlayerController: NSObject, WKNavigationDelegate {
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
         + "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15"
 
+    private var optimizeTimer: Timer?
+
     override init() {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()  // persistent: keeps the login
@@ -27,6 +29,21 @@ final class PlayerController: NSObject, WKNavigationDelegate {
         super.init()
         webView.navigationDelegate = self
         webView.customUserAgent = Self.safariUserAgent
+        // Radio auto-advances to new tracks, which reset video quality to `auto`.
+        // Re-apply the low-data/audio optimization on a light timer so memory
+        // stays down across track changes. No-ops when nothing is playing.
+        optimizeTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) {
+            [weak self] _ in
+            self?.applyAudioOptimizations()
+        }
+    }
+
+    deinit { optimizeTimer?.invalidate() }
+
+    /// Pins the player to the lowest video quality (and audio mode on Premium) to
+    /// cut the WebView's video-decode memory. Safe to call repeatedly.
+    func applyAudioOptimizations() {
+        webView.evaluateJavaScript(YTMScript.preferAudioLowData, completionHandler: nil)
     }
 
     /// Loads a playlist. When `autoplay` is true the URL is converted to a YTM
@@ -62,11 +79,12 @@ final class PlayerController: NSObject, WKNavigationDelegate {
     }
 
     // YTM builds its player after `didFinish`; retry a handful of times so the
-    // first play actually lands.
+    // first play actually lands, and pin low-data/audio on each pass.
     private func attemptAutoplay() {
         guard autoplayAfterLoad, autoplayAttempts < 6 else { return }
         autoplayAttempts += 1
         play()
+        applyAudioOptimizations()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) { [weak self] in
             self?.attemptAutoplay()
         }
