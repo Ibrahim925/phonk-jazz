@@ -14,7 +14,7 @@ final class AppController: NSObject {
 
     private let player = PlayerController()
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    private var hotKey: GlobalHotKey?
+    private let hotKeys = HotKeyCenter()
     private var settings: SettingsWindowController?
     private var playerWindow: PlayerWindowController?
 
@@ -29,11 +29,7 @@ final class AppController: NSObject {
         // is responsive. Keep the WebView off-screen — audio plays regardless.
         player.load(config.playlistURL(for: mode), autoplay: false)
 
-        hotKey = GlobalHotKey(
-            keyCode: UInt32(kVK_ANSI_J),
-            modifiers: UInt32(controlKey | optionKey | cmdKey)
-        )
-        hotKey?.onFire = { [weak self] in self?.toggleMode() }
+        applyHotKeys()
     }
 
     // MARK: - Intents
@@ -48,11 +44,14 @@ final class AppController: NSObject {
 
     @objc private func toggleModeAction() { toggleMode() }
 
-    @objc private func playPauseAction() {
+    /// Toggles playback of whatever is loaded.
+    func togglePlayPause() {
         player.togglePlayPause()
         isPlaying.toggle()
         render()
     }
+
+    @objc private func playPauseAction() { togglePlayPause() }
 
     @objc private func openSettingsAction() {
         let controller = SettingsWindowController(config: config)
@@ -62,6 +61,7 @@ final class AppController: NSObject {
             try? self.store.save(newConfig)
             // Reflect the edit immediately if we're currently playing.
             self.player.load(newConfig.playlistURL(for: self.mode), autoplay: self.isPlaying)
+            self.applyHotKeys()
         }
         settings = controller
         controller.present()
@@ -72,6 +72,34 @@ final class AppController: NSObject {
             playerWindow = PlayerWindowController(webView: player.webView)
         }
         playerWindow?.present()
+    }
+
+    // MARK: - Shortcuts
+
+    /// (Re)registers both global shortcuts from the current config. Called at
+    /// launch and after Settings saves, so a rebind is live immediately.
+    ///
+    /// A combination another app already owns can't be registered; tell the user
+    /// rather than leaving a dead key.
+    private func applyHotKeys() {
+        let rejected = hotKeys.apply([
+            .toggleMode: (config.toggleShortcut, { [weak self] in self?.toggleMode() }),
+            .playPause: (config.playPauseShortcut, { [weak self] in self?.togglePlayPause() }),
+        ])
+        guard !rejected.isEmpty else { return }
+
+        let names = rejected.map { binding -> String in
+            switch binding {
+            case .toggleMode: return "Toggle (\(config.toggleShortcut.displayString))"
+            case .playPause: return "Play/Pause (\(config.playPauseShortcut.displayString))"
+            }
+        }
+        let alert = NSAlert()
+        alert.messageText = "Shortcut unavailable"
+        alert.informativeText =
+            "macOS refused to register: \(names.joined(separator: ", ")).\n\n"
+            + "Another app is probably using that combination. Pick a different one in Settings."
+        alert.runModal()
     }
 
     // MARK: - UI

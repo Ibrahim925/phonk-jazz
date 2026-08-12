@@ -97,6 +97,33 @@
       ],
       "evidence": "Makefile `app` target. Verified 2026-08-06: bundle built (Contents/{Info.plist,MacOS/PhonkJazz}), LSUIElement=true, launches menubar-only.",
       "notes": "Unsigned — Gatekeeper may require right-click > Open on first launch, or an ad-hoc/Developer ID signature (follow-up)."
+    },
+    {
+      "id": "configurable-shortcuts",
+      "area": "input",
+      "title": "Configurable global shortcuts (play/pause + mode toggle)",
+      "user_visible_behavior": "A second global shortcut (default Ctrl+Opt+Cmd+P) toggles play/pause from any app. Both it and the jazz/phonk toggle are rebindable in Settings by clicking a field and pressing the desired combination; bindings persist and take effect immediately without a relaunch.",
+      "status": "blocked",
+      "verification": [
+        "make test — Shortcut display/validation + AppConfig decoding an old config.json without shortcut keys (playlists preserved, shortcuts defaulted)",
+        "manual (make dev): press Ctrl+Opt+Cmd+P from another app — playback toggles; rebind both shortcuts in Settings, press the new combos, relaunch and confirm they persisted"
+      ],
+      "evidence": "Core: Sources/PhonkJazzCore/Shortcut.swift (ModifierKeys + Shortcut + key-name table) and AppConfig gains toggleShortcut/playPauseShortcut with additive decoding. App: Sources/PhonkJazz/HotKeyCenter.swift (one Carbon handler, routes on EventHotKeyID, apply() rebinds live, reports refusals), ShortcutRecorderView.swift (click-to-record, intercepts performKeyEquivalent so Cmd-combos are capturable), SettingsWindowController.swift (two recorder rows, collision + URL validation), AppController.applyHotKeys(). Verified 2026-08-11: make check green (lint 0, build clean, 16/16 tests incl. 6 new ShortcutTests); release .app launch smoke — process alive, no trap in the registration path.",
+      "notes": "Carbon dispatch fixed: one installed handler routes by EventHotKeyID, so a second binding no longer fires both callbacks. Blocked only on manual acceptance — a physical global keypress can't be simulated without the Accessibility permission this app deliberately avoids."
+    },
+    {
+      "id": "now-playing-panel",
+      "area": "ui",
+      "title": "Now-playing panel on menubar click",
+      "user_visible_behavior": "Clicking the menubar icon opens a panel showing the current track's album art, title, artist and album, a draggable seek bar with elapsed/total time, and previous / play-pause / next controls. It also carries the former menu commands (Toggle, Sign in, Settings, Quit). Info and progress update live while the panel is open.",
+      "status": "not_started",
+      "verification": [
+        "make test — NowPlaying payload decoding, mm:ss formatting, progress-fraction clamping",
+        "headless WKWebView: load the configured playlist and confirm the metadata script returns a real title/artist/duration payload",
+        "manual (make dev): click the icon while a track plays — art/title/artist/album show, the seek bar tracks and scrubs, prev/next change track, play/pause works, and the folded-in commands still function"
+      ],
+      "evidence": "",
+      "notes": "Metadata read from navigator.mediaSession.metadata (YTM populates it, incl. artwork) with a DOM fallback; position/duration from the video element. Replaces statusItem.menu, so left-click opens the panel and every old menu command is folded into it."
     }
   ]
 }

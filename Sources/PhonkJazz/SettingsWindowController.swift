@@ -1,8 +1,9 @@
 import AppKit
 import PhonkJazzCore
 
-/// A small settings window for editing the two playlist URLs. Validates input
-/// before handing a new `AppConfig` back to the caller via `onSave`.
+/// A small settings window for editing the two playlist URLs and the two global
+/// shortcuts. Validates input before handing a new `AppConfig` back to the caller
+/// via `onSave`.
 @MainActor
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     /// Called with the validated, saved config when the user clicks Save.
@@ -10,11 +11,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private let jazzField = NSTextField()
     private let phonkField = NSTextField()
+    private let toggleRecorder: ShortcutRecorderView
+    private let playPauseRecorder: ShortcutRecorderView
 
     /// Builds the window pre-filled from `config`.
     init(config: AppConfig) {
+        toggleRecorder = ShortcutRecorderView(shortcut: config.toggleShortcut)
+        playPauseRecorder = ShortcutRecorderView(shortcut: config.playPauseShortcut)
+
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 170),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 290),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -48,6 +54,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             field.lineBreakMode = .byTruncatingTail
         }
 
+        let shortcutsHeader = makeLabel("Global shortcuts")
+        shortcutsHeader.font = .boldSystemFont(ofSize: NSFont.systemFontSize)
+        let hint = makeLabel("Click a field, then press the combination you want.")
+        hint.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        hint.textColor = .secondaryLabelColor
+        let toggleLabel = makeLabel("Toggle jazz / phonk")
+        let playPauseLabel = makeLabel("Play / pause")
+
         let saveButton = NSButton(title: "Save", target: self, action: #selector(save))
         saveButton.keyEquivalent = "\r"
         let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancel))
@@ -57,7 +71,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             button.translatesAutoresizingMaskIntoConstraints = false
         }
 
-        for view in [jazzLabel, jazzField, phonkLabel, phonkField, saveButton, cancelButton] {
+        for view in [
+            jazzLabel, jazzField, phonkLabel, phonkField, shortcutsHeader, hint, toggleLabel,
+            toggleRecorder, playPauseLabel, playPauseRecorder, saveButton, cancelButton,
+        ] {
             content.addSubview(view)
         }
 
@@ -73,6 +90,26 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             phonkField.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
             phonkField.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
             phonkField.topAnchor.constraint(equalTo: phonkLabel.bottomAnchor, constant: 4),
+
+            shortcutsHeader.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            shortcutsHeader.topAnchor.constraint(equalTo: phonkField.bottomAnchor, constant: 20),
+            hint.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            hint.topAnchor.constraint(equalTo: shortcutsHeader.bottomAnchor, constant: 2),
+
+            toggleLabel.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            toggleLabel.centerYAnchor.constraint(equalTo: toggleRecorder.centerYAnchor),
+            toggleRecorder.topAnchor.constraint(equalTo: hint.bottomAnchor, constant: 10),
+            toggleRecorder.trailingAnchor.constraint(
+                equalTo: content.trailingAnchor, constant: -20),
+            toggleRecorder.widthAnchor.constraint(equalToConstant: 170),
+
+            playPauseLabel.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            playPauseLabel.centerYAnchor.constraint(equalTo: playPauseRecorder.centerYAnchor),
+            playPauseRecorder.topAnchor.constraint(
+                equalTo: toggleRecorder.bottomAnchor, constant: 8),
+            playPauseRecorder.trailingAnchor.constraint(
+                equalTo: content.trailingAnchor, constant: -20),
+            playPauseRecorder.widthAnchor.constraint(equalToConstant: 170),
 
             saveButton.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
             saveButton.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -18),
@@ -92,15 +129,39 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let jazz = jazzField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         let phonk = phonkField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         for value in [jazz, phonk] where !AppConfig.isValidPlaylistURL(value) {
-            let alert = NSAlert()
-            alert.messageText = "Invalid playlist URL"
-            alert.informativeText =
+            warn(
+                "Invalid playlist URL",
                 "Each URL must be a music.youtube.com playlist link containing 'list='.\n\nNot valid: \(value)"
-            alert.runModal()
+            )
             return
         }
-        onSave(AppConfig(jazzURL: jazz, phonkURL: phonk))
+
+        let toggle = toggleRecorder.shortcut
+        let playPause = playPauseRecorder.shortcut
+        guard toggle != playPause else {
+            warn(
+                "Shortcuts collide",
+                "Toggle and Play/Pause are both set to \(toggle.displayString). Give them different combinations."
+            )
+            return
+        }
+
+        onSave(
+            AppConfig(
+                jazzURL: jazz,
+                phonkURL: phonk,
+                toggleShortcut: toggle,
+                playPauseShortcut: playPause
+            )
+        )
         close()
+    }
+
+    private func warn(_ title: String, _ detail: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = detail
+        alert.runModal()
     }
 
     @objc private func cancel() {
