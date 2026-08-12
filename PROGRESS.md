@@ -13,21 +13,72 @@ what a verification command actually confirmed.
   `Sources/PhonkJazzCore`; AppKit/WebKit app in `Sources/PhonkJazz`.
 
 ## Current Verified State
-- **Branch/commit:** app implemented on top of the harness checkpoint.
+- **Branch/commit:** two features landed on top of the open-source checkpoint —
+  `5da739b` (configurable shortcuts) + the now-playing panel commit.
 - **Verification status:** `make check` green — swift-format lint 0 issues,
-  `swift build` clean, `swift test` 6/6 passing (`ModeTests` + `ConfigTests`).
-  `make app` builds a menubar-only `PhonkJazz.app` (LSUIElement=true) that launches.
-- **Start:** `make dev` (or `make app` then open `PhonkJazz.app`) launches the
-  menubar app: status item shows mode + play state; menu = Toggle / Play-Pause /
-  Sign in-Show Player / Settings / Quit; global hotkey Ctrl+Opt+Cmd+J toggles.
+  `swift build` clean, `swift test` 23/23 passing (`ModeTests`, `ConfigTests`,
+  `YTMURLTests`, `ShortcutTests`, `NowPlayingTests`). `make app` builds a
+  menubar-only `PhonkJazz.app` (LSUIElement=true) that launches and persists.
+- **Start:** `make dev` (or `make app` then open `PhonkJazz.app`). The status item
+  shows mode + play state; **clicking it opens the now-playing panel** (artwork,
+  title/artist/album, seek bar, prev/play/next, mode button, and a "…" menu with
+  Sign in / Settings / Quit — there is no separate NSMenu any more). Global
+  shortcuts: ⌃⌥⌘J toggles jazz/phonk, ⌃⌥⌘P toggles play/pause; both rebindable in
+  Settings.
+- **Verified against the live site this session** (throwaway headless WKWebView
+  probe, non-persistent store, running the *shipped* scripts): metadata reads
+  `{"title":"Vois Sur Ton Chemin","artist":"deprezz","duration":187}`, and
+  `seek(30)` returns `api` with `currentTime` reading back 30. Panel layout smoke
+  (panel source compiled against Core) passes with no constraint conflicts.
 - **Next priority:** manual acceptance on the user's machine — open "Sign in /
-  Show Player…" and log into Google, confirm audio plays, confirm the hotkey
-  toggles. See the `blocked` features in `feature_list.json`.
-- **Blockers:** (1) Audio/login/keypress are GUI-only, verifiable only via
-  `make dev` on a real display with the user's Google account. (2) Bundle is
-  unsigned — Gatekeeper may need right-click > Open (or a signature).
+  Show Player…", log into Google, confirm audio; confirm ⌃⌥⌘P toggles playback
+  from another app; open the panel while a track plays and check artwork, that the
+  seek bar advances and scrubs, and that prev/next work. See the `blocked`
+  features in `feature_list.json`.
+- **Blockers:** (1) Audio/login/keypress/panel visuals are GUI-only, verifiable
+  only via `make dev` on a real display with the user's Google account. (2) Bundle
+  is unsigned — Gatekeeper may need right-click > Open (or a signature).
+  (3) Logged out, YTM plays **ads** whose metadata also appears in the media
+  session; a logged-in check is the real test.
 
 ## Session Records
+
+### 2026-08-11 (feature) — Configurable shortcuts + now-playing panel
+- Outcome: both features code-complete, automated + live-page verification green;
+  GUI acceptance (audio, physical keypress, panel visuals) pending on the user's
+  machine. Decisions were taken with the user up front (default binding, panel vs
+  menu, both bindings rebindable, full transport incl. scrubbing).
+- Did: **Shortcuts** — new Core `Shortcut`/`ModifierKeys` (pure, no Carbon in
+  Core) with a key-name table, validity rule (needs ⌃/⌥/⌘), and `AppConfig`
+  carrying both bindings with additive decoding; replaced `GlobalHotKey` with
+  `HotKeyCenter` (one Carbon handler routed by `EventHotKeyID` — the old
+  one-handler-per-hotkey shape would have fired every callback for every hotkey),
+  added `ShortcutRecorderView` (click-to-record, intercepts `performKeyEquivalent`
+  so ⌘-combos are capturable) and two recorder rows in Settings with
+  collision/validity alerts; `AppController.applyHotKeys()` re-registers on save.
+  **Panel** — new Core `NowPlaying` (tolerant decoding, `m:ss`, clamped progress,
+  seek target), `NowPlayingPanelController` in an `NSPopover` (artwork, text,
+  draggable seek bar, prev/play/next, mode button, "…" menu), `PlayerController`
+  gained next/previous/seek/fetchNowPlaying, `AppController` owns the popover and
+  polls 0.5s **only while it is open**; `statusItem.menu` removed.
+- Found while verifying (the session's real discovery): the page's single
+  `<video>` reports `duration: NaN`, `readyState: 0`, `currentTime: 0`
+  indefinitely while `paused` is `false`, so the previous media-element-only
+  scripts would have produced a frozen `0:00 / --:--` seek bar and an inverted
+  play state, and `video.currentTime = x` is a silent no-op. `YTMScript` was
+  rewritten around shared helpers that read `#movie_player` first (state, times,
+  `seekTo`), with the media element and player bar as fallbacks — recorded in
+  DECISIONS.md and docs/ytmusic-integration.md.
+- Verification run: `make check` green (lint 0, build clean, 23/23 tests — 13 new
+  across `ShortcutTests` + `NowPlayingTests`); live headless probe of the shipped
+  scripts (metadata + duration + `seekTo` round-trip); panel layout smoke (view
+  loads, 9 subviews, slider 0.1604 == 30/187, idle disables the bar, no constraint
+  conflicts); release `.app` launch smoke (accessory process alive, then killed).
+  NOT run: Google login, real audio, physical global keypress, visual panel check.
+- Risks / follow-ups: `next`/`previous` rely on player-bar selectors (most
+  redesign-fragile part, `#movie_player.nextVideo()` is the fallback); artwork is
+  fetched over the network per track change (cached by URL, no disk cache); ads
+  in a logged-out session surface as "tracks"; bundle still unsigned.
 
 ### 2026-08-06 (open-source) — Publish public MIT repo
 - Outcome: done. Repo live and public at https://github.com/Ibrahim925/phonk-jazz.

@@ -5,13 +5,13 @@
       "id": "menubar-status-item",
       "area": "ui",
       "title": "Menubar control surface",
-      "user_visible_behavior": "A menubar (status bar) item appears with no Dock icon and no window; its title reflects the current mode (JZ/PH) and play state. Its menu offers Toggle, Play/Pause, Settings, and Quit.",
+      "user_visible_behavior": "A menubar (status bar) item appears with no Dock icon and no window; its title reflects the current mode (JZ/PH) and play state. Clicking it opens the now-playing panel, which carries the Toggle / Sign in / Settings / Quit commands (see feature now-playing-panel).",
       "status": "passing",
       "verification": [
-        "launch smoke: PhonkJazz.app/Contents/MacOS/PhonkJazz runs as .accessory (no Dock icon), process persists; menu built with Toggle/Play-Pause/Settings/Quit"
+        "launch smoke: PhonkJazz.app/Contents/MacOS/PhonkJazz runs as .accessory (no Dock icon), process persists; status item built with a click action that presents the now-playing popover"
       ],
-      "evidence": "Implemented in Sources/PhonkJazz/{main,AppController}.swift. Verified 2026-08-06: launches accessory/no-Dock, process alive 3s+, make check green. Visual title/menu render best-confirmed by the user via `make dev`.",
-      "notes": ""
+      "evidence": "Implemented in Sources/PhonkJazz/{main,AppController}.swift. Verified 2026-08-06 and again 2026-08-11 after the panel change: launches accessory/no-Dock, process alive 3s+, make check green. Visual title render best-confirmed by the user via `make dev`.",
+      "notes": "The plain NSMenu this shipped with was replaced by the now-playing panel on 2026-08-11; statusItem.menu is deliberately left unassigned."
     },
     {
       "id": "config-persistence",
@@ -116,14 +116,15 @@
       "area": "ui",
       "title": "Now-playing panel on menubar click",
       "user_visible_behavior": "Clicking the menubar icon opens a panel showing the current track's album art, title, artist and album, a draggable seek bar with elapsed/total time, and previous / play-pause / next controls. It also carries the former menu commands (Toggle, Sign in, Settings, Quit). Info and progress update live while the panel is open.",
-      "status": "not_started",
+      "status": "blocked",
       "verification": [
         "make test — NowPlaying payload decoding, mm:ss formatting, progress-fraction clamping",
-        "headless WKWebView: load the configured playlist and confirm the metadata script returns a real title/artist/duration payload",
+        "headless WKWebView (throwaway probe, shipped script extracted from YTMScript.swift): metadata + duration + seek verified against the live site",
+        "panel layout smoke (throwaway, panel source compiled against Core): view loads, no constraint conflicts, labels/slider/transport render for a real and an idle snapshot",
         "manual (make dev): click the icon while a track plays — art/title/artist/album show, the seek bar tracks and scrubs, prev/next change track, play/pause works, and the folded-in commands still function"
       ],
-      "evidence": "",
-      "notes": "Metadata read from navigator.mediaSession.metadata (YTM populates it, incl. artwork) with a DOM fallback; position/duration from the video element. Replaces statusItem.menu, so left-click opens the panel and every old menu command is folded into it."
+      "evidence": "Core: Sources/PhonkJazzCore/NowPlaying.swift (+7 NowPlayingTests). App: NowPlayingPanelController.swift (NSPopover content: artwork, title/artist/album, seek slider with elapsed/total, prev/play/next, mode button, '…' menu), YTMScript.swift rewritten around shared state helpers, PlayerController next/previous/seek/fetchNowPlaying, AppController owns the popover + 0.5s poll while open. Verified 2026-08-11: make check green (lint 0, build clean, 23/23 tests); live probe returned {\"title\":\"Vois Sur Ton Chemin\",\"artist\":\"deprezz\",\"duration\":187} and seek(30) -> 'api' with currentTime reading back 30; panel smoke PASS (9 subviews, slider 0.1604 == 30/187, idle state disables the bar); release .app launch smoke alive.",
+      "notes": "Found and fixed while verifying: the page's single <video> reports duration NaN / readyState 0 / paused false indefinitely, so the old media-element-only scripts would have shown a frozen 0:00 seek bar and an inverted play state. State now reads #movie_player first (see docs/ytmusic-integration.md). Blocked only on manual acceptance: artwork rendering, scrub feel, and prev/next need a logged-in session on the user's display."
     }
   ]
 }

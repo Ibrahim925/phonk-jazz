@@ -5,10 +5,12 @@
 
 ## Overview
 Phonk/Jazz is a macOS **menubar-only** desktop app. It embeds the YouTube Music
-web player and exposes a single global shortcut (`Ctrl+Opt+Cmd+J`) that toggles
-playback between an **instrumental-jazz** playlist (reading mode) and a **phonk**
-playlist (focus/work mode). Success = from any app, one keypress flips between
-the two playlists with no visible window required.
+web player and exposes two rebindable global shortcuts: one (`Ctrl+Opt+Cmd+J`)
+toggles playback between an **instrumental-jazz** playlist (reading mode) and a
+**phonk** playlist (focus/work mode), the other (`Ctrl+Opt+Cmd+P`) toggles
+play/pause. Clicking the menubar icon opens a now-playing panel (artwork, track
+text, seek bar, prev/play/next, plus the app's commands). Success = from any app,
+one keypress flips between the two playlists with no visible window required.
 
 ## Stack
 | Piece | Choice |

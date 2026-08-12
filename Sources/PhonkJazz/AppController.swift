@@ -1,12 +1,12 @@
 import AppKit
-import Carbon.HIToolbox
 import PhonkJazzCore
 
 /// The app's brain. Owns the current `Mode` and config, the menubar status item,
-/// the embedded player, the global hotkey, and the settings window; routes every
-/// user intent (hotkey, menu, settings) onto the player and status item.
+/// the now-playing panel, the embedded player, the global shortcuts, and the
+/// settings window; routes every user intent (shortcut, panel, settings) onto the
+/// player and status item.
 @MainActor
-final class AppController: NSObject {
+final class AppController: NSObject, NSPopoverDelegate {
     private let store = ConfigStore()
     private var config: AppConfig
     private var mode: Mode = .jazz
@@ -18,11 +18,17 @@ final class AppController: NSObject {
     private var settings: SettingsWindowController?
     private var playerWindow: PlayerWindowController?
 
+    private let panel = NowPlayingPanelController()
+    private let popover = NSPopover()
+    /// Polls the page for track/position while the panel is open, and only then.
+    private var pollTimer: Timer?
+
     override init() {
         config = store.load()
         super.init()
 
-        buildMenu()
+        buildStatusItem()
+        buildPanel()
         render()
 
         // Preload the current mode's playlist (no autoplay) so the first toggle
@@ -40,20 +46,18 @@ final class AppController: NSObject {
         player.load(config.playlistURL(for: mode), autoplay: true)
         isPlaying = true
         render()
+        refreshSoon()
     }
-
-    @objc private func toggleModeAction() { toggleMode() }
 
     /// Toggles playback of whatever is loaded.
     func togglePlayPause() {
         player.togglePlayPause()
         isPlaying.toggle()
         render()
+        refreshSoon()
     }
 
-    @objc private func playPauseAction() { togglePlayPause() }
-
-    @objc private func openSettingsAction() {
+    private func openSettings() {
         let controller = SettingsWindowController(config: config)
         controller.onSave = { [weak self] newConfig in
             guard let self else { return }
@@ -62,12 +66,14 @@ final class AppController: NSObject {
             // Reflect the edit immediately if we're currently playing.
             self.player.load(newConfig.playlistURL(for: self.mode), autoplay: self.isPlaying)
             self.applyHotKeys()
+            self.panel.showShortcuts(
+                toggle: newConfig.toggleShortcut, playPause: newConfig.playPauseShortcut)
         }
         settings = controller
         controller.present()
     }
 
-    @objc private func showPlayerAction() {
+    private func showPlayerWindow() {
         if playerWindow == nil {
             playerWindow = PlayerWindowController(webView: player.webView)
         }
@@ -102,33 +108,101 @@ final class AppController: NSObject {
         alert.runModal()
     }
 
-    // MARK: - UI
+    // MARK: - Panel
 
-    private func buildMenu() {
-        let menu = NSMenu()
-        menu.addItem(
-            withTitle: "Toggle Jazz / Phonk", action: #selector(toggleModeAction),
-            keyEquivalent: ""
-        ).target = self
-        menu.addItem(
-            withTitle: "Play / Pause", action: #selector(playPauseAction), keyEquivalent: ""
-        ).target = self
-        menu.addItem(.separator())
-        menu.addItem(
-            withTitle: "Sign in / Show Player…", action: #selector(showPlayerAction),
-            keyEquivalent: ""
-        ).target = self
-        menu.addItem(.separator())
-        menu.addItem(
-            withTitle: "Settings…", action: #selector(openSettingsAction), keyEquivalent: ","
-        ).target = self
-        menu.addItem(.separator())
-        menu.addItem(
-            withTitle: "Quit Phonk/Jazz", action: #selector(NSApplication.terminate(_:)),
-            keyEquivalent: "q"
-        )
-        statusItem.menu = menu
+    private func buildStatusItem() {
+        // No `statusItem.menu`: assigning one makes AppKit swallow the click and
+        // open the menu, which would leave the panel unreachable.
+        guard let button = statusItem.button else { return }
+        button.target = self
+        button.action = #selector(statusItemClicked)
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
     }
+
+    private func buildPanel() {
+        popover.contentViewController = panel
+        popover.behavior = .transient
+        popover.delegate = self
+        panel.showShortcuts(toggle: config.toggleShortcut, playPause: config.playPauseShortcut)
+        panel.onCommand = { [weak self] command in self?.handle(command) }
+    }
+
+    private func handle(_ command: NowPlayingPanelController.Command) {
+        switch command {
+        case .playPause: togglePlayPause()
+        case .next:
+            player.next()
+            refreshSoon()
+        case .previous:
+            player.previous()
+            refreshSoon()
+        case .seek(let seconds):
+            player.seek(to: seconds)
+            refreshNowPlaying()
+        case .toggleMode: toggleMode()
+        case .showPlayer:
+            popover.performClose(nil)
+            showPlayerWindow()
+        case .settings:
+            popover.performClose(nil)
+            openSettings()
+        case .quit: NSApp.terminate(nil)
+        }
+    }
+
+    @objc private func statusItemClicked() {
+        if popover.isShown {
+            popover.performClose(nil)
+            return
+        }
+        guard let button = statusItem.button else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        refreshNowPlaying()
+        startPolling()
+    }
+
+    /// Stop polling as soon as the panel goes away — a menubar app has no business
+    /// waking twice a second while nobody is looking at it.
+    func popoverDidClose(_ notification: Notification) {
+        stopPolling()
+    }
+
+    private func startPolling() {
+        stopPolling()
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refreshNowPlaying() }
+        }
+    }
+
+    private func stopPolling() {
+        pollTimer?.invalidate()
+        pollTimer = nil
+    }
+
+    /// Reads the page and re-renders. The page is the source of truth for whether
+    /// audio is actually playing, so this also corrects our optimistic guess.
+    private func refreshNowPlaying() {
+        player.fetchNowPlaying { [weak self] track in
+            guard let self else { return }
+            if !track.isEmpty || track.duration > 0 {
+                self.isPlaying = track.isPlaying
+            }
+            self.panel.render(track, mode: self.mode)
+            self.render()
+        }
+    }
+
+    /// Re-read shortly after an action: YTM applies play/pause/skip
+    /// asynchronously, so an immediate read would report the old state.
+    private func refreshSoon() {
+        guard popover.isShown else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            self?.refreshNowPlaying()
+        }
+    }
+
+    // MARK: - UI
 
     private func render() {
         let glyph = isPlaying ? "▶" : "❚❚"

@@ -46,20 +46,54 @@ navigating there only *shows* the playlist — its `<video>` element stays pause
 with no source, so nothing plays. To actually start playback, navigate to the
 **watch** URL `https://music.youtube.com/watch?list=<ID>`: YTM loads the player,
 auto-selects the first track, and begins playing. (Verified against the live
-site: playlist URL → `video.paused == true`; watch URL → `video.paused == false`.)
-Use `YTMURL.watchURL(from:)` (Core) to convert. Then reinforce with JS:
+site: playlist URL → `video.paused == true`; watch URL → `video.paused == false`.
+Caveat, measured later: `paused == false` alone does **not** prove audio is
+decoding — see the next section — so treat it as "the page intends to play".)
+Use `YTMURL.watchURL(from:)` (Core) to convert.
 
-```swift
-// Start / resume playback (illustrative — verify selectors against the live DOM)
-webView.evaluateJavaScript("document.querySelector('video')?.play()")
-// Play/pause toggle via the player bar button is more robust than raw media API:
-//   document.querySelector('#play-pause-button')?.click()
-```
+## Reading state: do NOT trust the `<video>` element alone
+
+Measured against the live site (headless `WKWebView`, logged out, 2026-08-11):
+the page has exactly **one** `<video>`, fed a `blob:` MSE stream, and it reports
+
+    duration: NaN   readyState: 0   currentTime: 0   paused: false
+
+…indefinitely, while `navigator.mediaSession.playbackState` says `"playing"`.
+So a media-element-only reading gives a seek bar frozen at `0:00 / --:--` and an
+inverted play/pause state. `#movie_player` answered correctly at the same moment
+(`getDuration() === 110`), and the player bar agreed (`#progress-bar`
+`aria-valuemax="111"`, `.time-info` "0:00 / 1:51").
+
+`YTMScript` therefore reads through helpers with a fixed precedence:
+
+| Need | Order |
+|---|---|
+| position / duration | `<video>` when `duration` is finite -> `#movie_player.getCurrentTime()/getDuration()` -> `#progress-bar` aria values |
+| playing? | `#movie_player.getPlayerState()` (1 playing, 3 buffering) -> `!video.paused && !video.ended` -> `mediaSession.playbackState` |
+| play / pause / seek | `#movie_player.playVideo()/pauseVideo()/seekTo(s, true)` -> media element -> player-bar button |
+| next / previous | player-bar `.next-button`/`.previous-button` -> `#movie_player.nextVideo()/previousVideo()` |
+
+Assigning `video.currentTime` is a silent no-op in the stalled MSE state, which
+is why seeking goes through `seekTo`. Verified live: `seekTo(30)` returned `api`
+and the next read reported `currentTime: 30`.
+
+## Track metadata (title / artist / album / artwork)
+
+`navigator.mediaSession.metadata` is the primary source — YTM populates it for
+the system now-playing UI and it survives redesigns far better than the DOM. The
+player bar (`ytmusic-player-bar .title` / `.byline`) is the fallback; the byline
+reads "Artist • Album • Year", so a bare 4-digit segment is not an album.
+Artwork: pick the largest `md.artwork[]` entry by declared `sizes`.
+
+Verified live: `{"title":"Vois Sur Ton Chemin","artist":"deprezz","duration":187}`.
+Logged out, YTM inserts **ad** playback whose metadata appears in the media
+session too (an ad title showed up before the first real track) — expected, and
+one more reason the panel renders whatever the page reports rather than caching.
 
 > Selectors on music.youtube.com are **not a stable contract** and change over
-> time. Prefer the media element (`document.querySelector('video')`) and the
-> player-bar play/pause control; centralize all selectors in one place so a YTM
-> redesign is a one-file fix. Confirm against the live DOM when implementing.
+> time. Everything above is centralized in `Sources/PhonkJazz/YTMScript.swift`,
+> so a YTM redesign is a one-file fix. Confirm against the live DOM when
+> implementing.
 
 ## Autoplay
 YTM may require a user gesture before audio can start. Options to evaluate during

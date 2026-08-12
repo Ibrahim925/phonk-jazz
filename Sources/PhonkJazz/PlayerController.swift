@@ -72,6 +72,37 @@ final class PlayerController: NSObject, WKNavigationDelegate {
         webView.evaluateJavaScript(YTMScript.toggle, completionHandler: nil)
     }
 
+    /// Skips to the next track.
+    func next() {
+        webView.evaluateJavaScript(YTMScript.next, completionHandler: nil)
+    }
+
+    /// Skips to the previous track.
+    func previous() {
+        webView.evaluateJavaScript(YTMScript.previous, completionHandler: nil)
+    }
+
+    /// Jumps to `seconds` into the current track.
+    func seek(to seconds: Double) {
+        webView.evaluateJavaScript(YTMScript.seek(to: seconds), completionHandler: nil)
+    }
+
+    /// Reads the current track from the page.
+    ///
+    /// Yields an empty snapshot rather than an error when nothing is loaded yet
+    /// or the script can't run — the panel always has something to render.
+    func fetchNowPlaying(_ completion: @escaping (NowPlaying) -> Void) {
+        webView.evaluateJavaScript(YTMScript.nowPlaying) { result, _ in
+            guard let json = result as? String, let data = json.data(using: .utf8),
+                let track = try? JSONDecoder().decode(NowPlaying.self, from: data)
+            else {
+                completion(NowPlaying())
+                return
+            }
+            completion(track)
+        }
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard autoplayAfterLoad else { return }
         autoplayAttempts = 0
