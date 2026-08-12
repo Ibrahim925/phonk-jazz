@@ -13,8 +13,9 @@ what a verification command actually confirmed.
   `Sources/PhonkJazzCore`; AppKit/WebKit app in `Sources/PhonkJazz`.
 
 ## Current Verified State
-- **Branch/commit:** two features landed on top of the open-source checkpoint —
-  `5da739b` (configurable shortcuts) + the now-playing panel commit.
+- **Branch/commit:** `main` = `e97023f` (now-playing panel) on `3f41f36`
+  (configurable shortcuts), rebased onto upstream `66fcbb3` (the webview
+  memory/quality work). `make check` re-run green after the rebase.
 - **Verification status:** `make check` green — swift-format lint 0 issues,
   `swift build` clean, `swift test` 23/23 passing (`ModeTests`, `ConfigTests`,
   `YTMURLTests`, `ShortcutTests`, `NowPlayingTests`). `make app` builds a
@@ -79,6 +80,15 @@ what a verification command actually confirmed.
   redesign-fragile part, `#movie_player.nextVideo()` is the fallback); artwork is
   fetched over the network per track change (cached by URL, no disk cache); ads
   in a logged-out session surface as "tracks"; bundle still unsigned.
+- Rebase note: `git pull --rebase` brought in upstream `66fcbb3` (cap video
+  quality / prefer audio to cut WebContent memory), which conflicted in
+  `YTMScript.swift` — that commit appended `preferAudioLowData` to the same file
+  this session rewrote around shared state helpers. Resolved by keeping the
+  rewrite and re-adding `preferAudioLowData` verbatim (its `#movie_player` quality
+  API and `.song-button` selectors were verified separately on 2026-08-06 and were
+  left untouched). `PlayerController` auto-merged: the 15s re-apply timer and this
+  session's next/previous/seek/fetchNowPlaying coexist. `make check` green after
+  resolving (23/23).
 
 ### 2026-08-06 (open-source) — Publish public MIT repo
 - Outcome: done. Repo live and public at https://github.com/Ibrahim925/phonk-jazz.
