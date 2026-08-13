@@ -31,18 +31,43 @@ what a verification command actually confirmed.
   `{"title":"Vois Sur Ton Chemin","artist":"deprezz","duration":187}`, and
   `seek(30)` returns `api` with `currentTime` reading back 30. Panel layout smoke
   (panel source compiled against Core) passes with no constraint conflicts.
-- **Next priority:** manual acceptance on the user's machine — open "Sign in /
-  Show Player…", log into Google, confirm audio; confirm ⌃⌥⌘P toggles playback
-  from another app; open the panel while a track plays and check artwork, that the
-  seek bar advances and scrubs, and that prev/next work. See the `blocked`
-  features in `feature_list.json`.
-- **Blockers:** (1) Audio/login/keypress/panel visuals are GUI-only, verifiable
-  only via `make dev` on a real display with the user's Google account. (2) Bundle
-  is unsigned — Gatekeeper may need right-click > Open (or a signature).
-  (3) Logged out, YTM plays **ads** whose metadata also appears in the media
-  session; a logged-in check is the real test.
+- **Accepted by the user 2026-08-12 (GUI, on their machine):** signed into Google
+  in-app and heard real audio; session survived quit + relaunch; ⌃⌥⌘P toggled
+  playback from another app; ⌃⌥⌘J flipped the playlist and the status item; a
+  rebound shortcut fired on its new combination; the panel showed artwork and
+  track text, the seek bar advanced and scrubbed, prev/next changed track. Nine of
+  ten features are now `passing`.
+- **Next priority:** finish the one remaining half-verification —
+  `settings-window` still needs "change a *playlist* URL, save, toggle, confirm
+  the new playlist plays" and "an invalid URL raises the alert". Then the app is
+  feature-complete against the current list.
+- **Blockers:** (1) Bundle is unsigned — Gatekeeper may need right-click > Open
+  (or an ad-hoc/Developer ID signature). (2) Nothing else: every GUI path in the
+  list has now been exercised on a real display except the two settings checks
+  above.
+- **Known behaviour, not a bug:** logged out, YTM plays **ads** whose metadata
+  also lands in the media session, so the panel will happily display an ad as a
+  "track". Signed in, this doesn't arise.
 
 ## Session Records
+
+### 2026-08-12 (acceptance) — GUI verification on the user's machine
+- Outcome: done. The user confirmed all six outstanding GUI checks; nine of ten
+  features moved to `passing` in `feature_list.json`, each with what was actually
+  observed recorded in its `evidence`.
+- Did: flipped `embed-ytm-webview`, `playback-control-js`, `mode-toggle`,
+  `global-hotkey`, `configurable-shortcuts` and `now-playing-panel` to `passing`;
+  refreshed `global-hotkey`'s evidence, which still referenced the deleted
+  `GlobalHotKey.swift` instead of `HotKeyCenter.swift`.
+- Deliberately NOT marked passing: `settings-window`. The user exercised the
+  window, the save path and shortcut rebinding, but not its own stated
+  verification (change a playlist URL -> next toggle uses it; invalid URL ->
+  alert). Left `blocked` with the remaining half named, rather than inflating it
+  on adjacent evidence.
+- Verification run: user acceptance as above; `make check` green (23/23) and CI
+  run #31633914896 green on the pushed HEAD.
+- Risks / follow-ups: unsigned bundle; player-bar selectors for prev/next remain
+  the most redesign-fragile surface; artwork has no disk cache.
 
 ### 2026-08-11 (feature) — Configurable shortcuts + now-playing panel
 - Outcome: both features code-complete, automated + live-page verification green;
